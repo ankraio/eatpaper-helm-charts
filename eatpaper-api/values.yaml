@@ -1,0 +1,144 @@
+# -- Application run mode (should be "api" for this chart)
+mode: "api"
+
+# -- Log level for the application (DEBUG, INFO, WARNING, ERROR)
+log_level: "INFO"
+
+# -- Number of pod replicas (ignored when autoscaling is enabled)
+replicaCount: 1
+
+# -- Database connection settings
+database:
+  port: 5432
+  name: "eatpaper"
+  # -- Name of the existing Secret containing `username` and `password` keys
+  secretName: "eatpaper-database-secret"
+  # -- Hostname of the read-write database instance
+  readWriteEndpoint: "eatpaper-rw"
+  # -- Hostname of the read-only database replica
+  readEndpoint: "eatpaper-r"
+
+# -- SMTP credentials
+smtp:
+  # -- Name of the existing Secret containing SMTP configuration
+  secretName: "eatpaper-smtp-secret"
+
+# -- Receipt file storage configuration
+# Supported backends: "local" (filesystem) or "s3" (S3-compatible object storage)
+storage:
+  # -- Storage backend type: "local" or "s3"
+  backend: "local"
+  # -- Mount path for receipt files when using the local backend
+  localPath: "/data/receipts"
+  # -- Persistence settings for the local backend (ignored when backend is "s3")
+  persistence:
+    # -- Create a PersistentVolumeClaim; set to false for ephemeral emptyDir (dev only)
+    enabled: true
+    # -- StorageClass name; leave empty for the cluster default
+    storageClass: ""
+    size: 5Gi
+    # -- ReadWriteMany is required when both the API and scheduler share the same volume
+    accessModes:
+      - ReadWriteMany
+    # -- Use an existing PVC instead of creating one
+    existingClaim: ""
+  # -- S3-compatible storage settings (ignored when backend is "local")
+  s3:
+    bucket: ""
+    endpoint: ""
+    region: "us-east-1"
+    # -- Name of an existing Secret with S3_ACCESS_KEY and S3_SECRET_KEY keys;
+    # when set, accessKey and secretKey below are ignored
+    existingSecret: ""
+    accessKey: ""
+    secretKey: ""
+
+service:
+  type: ClusterIP
+  port: 8000
+  name: http
+
+# -- Ingress configuration
+ingress:
+  enabled: true
+  # -- Fully qualified hostname; leave empty to accept traffic on any host.
+  hostname: ""
+  path: /api/
+  ingressClassName: nginx
+  # -- Annotations added to the Ingress resource.
+  # Override these when switching ingress controllers (e.g. from nginx to traefik).
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "12m"
+  # -- Enable TLS termination on the Ingress. Requires `hostname` to be set.
+  # The TLS secret name is derived as "<hostname>-tls".
+  # cert-manager will auto-populate this Secret when a matching ClusterIssuer
+  # annotation is present (e.g. cert-manager.io/cluster-issuer).
+  tls: true
+
+resources:
+  limits:
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+# -- Horizontal Pod Autoscaler
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  # -- Requires CPU requests to be set under `resources` to work reliably
+  targetCPUUtilizationPercentage: 80
+
+terminationGracePeriodSeconds: 10
+
+# -- Container image
+image:
+  repository: registry.ankra.cloud/eatpaper/eatpaper-backend
+  pullPolicy: Always
+  # -- List of registry pull secrets, e.g. [{name: my-secret}]
+  pullSecrets: []
+  # -- Overrides the image tag; defaults to Chart.appVersion
+  tag: ""
+
+# -- Service account for the API pods
+serviceAccount:
+  create: true
+  annotations: {}
+  name: "eatpaper-api-sa"
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  runAsUser: 1000
+  capabilities:
+    drop: ["ALL"]
+
+# -- Auth0 configuration for JWT validation
+auth0:
+  domain: ""
+  api_audience: ""
+  # -- Name of an existing Secret containing AUTH0_MGMT_CLIENT_ID and
+  # AUTH0_MGMT_CLIENT_SECRET keys. Required for the delete-account feature.
+  # When empty, account deletion will fail at runtime with a missing-envvar error.
+  mgmtSecretName: ""
+
+# -- Base URL of the frontend app (used for email invite links, etc.)
+frontend_base_url: ""
+
+# -- Comma-separated list of allowed CORS origins
+cors_allowed_origins: ""
+
+# -- URL of the external currency conversion API
+currency_api_url: ""
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

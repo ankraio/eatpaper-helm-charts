@@ -1,0 +1,125 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "eatpaper-scheduler.fullname" . }}
+  labels:
+    {{- include "eatpaper-scheduler.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      {{- include "eatpaper-scheduler.selectorLabels" . | nindent 6 }}
+  strategy:
+    type: Recreate
+    rollingUpdate: null
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "eatpaper-scheduler.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- if .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.image.pullSecrets | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "eatpaper-scheduler.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: scheduler
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ include "eatpaper-scheduler.imageTag" . }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: APP_MODE
+              value: "scheduler"
+            - name: DATABASE_NAME
+              value: {{ .Values.database.name | quote }}
+            - name: DATABASE_HOST
+              value: {{ .Values.database.readWriteEndpoint | quote }}
+            - name: DATABASE_PORT
+              value: {{ .Values.database.port | quote }}
+            - name: READ_WRITE_DATABASE_HOST
+              value: {{ .Values.database.readWriteEndpoint | quote }}
+            - name: READ_DATABASE_HOST
+              value: {{ .Values.database.readEndpoint | quote }}
+            - name: DATABASE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.secretName }}
+                  key: username
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.secretName }}
+                  key: password
+            - name: STORAGE_BACKEND
+              value: {{ .Values.storage.backend | quote }}
+            - name: STORAGE_LOCAL_PATH
+              value: {{ .Values.storage.localPath | quote }}
+            {{- if eq .Values.storage.backend "s3" }}
+            - name: S3_BUCKET
+              value: {{ .Values.storage.s3.bucket | quote }}
+            - name: S3_ENDPOINT
+              value: {{ .Values.storage.s3.endpoint | quote }}
+            - name: S3_REGION
+              value: {{ .Values.storage.s3.region | quote }}
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.storage.s3.existingSecret | default (printf "%s-s3" (include "eatpaper-scheduler.fullname" .)) }}
+                  key: S3_ACCESS_KEY
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.storage.s3.existingSecret | default (printf "%s-s3" (include "eatpaper-scheduler.fullname" .)) }}
+                  key: S3_SECRET_KEY
+            {{- end }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.smtp.secretName }}
+          {{- if eq .Values.storage.backend "local" }}
+          volumeMounts:
+            - name: receipt-storage
+              mountPath: {{ .Values.storage.localPath }}
+          {{- end }}
+          startupProbe:
+            exec:
+              command: ["sh", "-c", "pgrep -f python"]
+            failureThreshold: 6
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pgrep -f python"]
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- if eq .Values.storage.backend "local" }}
+      volumes:
+        - name: receipt-storage
+          {{- if .Values.storage.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.storage.persistence.existingClaim | default (printf "%s-receipts" (include "eatpaper-scheduler.fullname" .)) }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

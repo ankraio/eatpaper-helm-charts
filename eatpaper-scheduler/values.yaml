@@ -1,0 +1,93 @@
+# -- Number of pod replicas (scheduler should normally run as a singleton)
+replicaCount: 1
+
+# -- Application run mode (should be "scheduler" for this chart)
+mode: scheduler
+
+# -- Container image
+image:
+  repository: registry.ankra.cloud/eatpaper/eatpaper-backend
+  pullPolicy: IfNotPresent
+  # -- List of registry pull secrets, e.g. [{name: my-secret}]
+  pullSecrets: []
+  # -- Overrides the image tag; defaults to Chart.appVersion
+  tag: ""
+
+# -- Database connection settings
+database:
+  port: 5432
+  name: eatpaper
+  # -- Name of the existing Secret containing `username` and `password` keys
+  secretName: "eatpaper-database-secret"
+  # -- Hostname of the read-write database instance
+  readWriteEndpoint: "eatpaper-rw"
+  # -- Hostname of the read-only database replica
+  readEndpoint: "eatpaper-r"
+
+# -- SMTP credentials
+smtp:
+  # -- Name of the existing Secret containing SMTP configuration
+  secretName: "eatpaper-smtp-secret"
+
+# -- Receipt file storage configuration
+# Supported backends: "local" (filesystem) or "s3" (S3-compatible object storage)
+storage:
+  # -- Storage backend type: "local" or "s3"
+  backend: local
+  # -- Mount path for receipt files when using the local backend
+  localPath: /data/receipts
+  # -- Persistence settings for the local backend (ignored when backend is "s3")
+  persistence:
+    # -- Create a PersistentVolumeClaim; set to false for ephemeral emptyDir (dev only)
+    enabled: true
+    # -- StorageClass name; leave empty for the cluster default
+    storageClass: ""
+    size: 5Gi
+    # -- ReadWriteMany is required when both the API and scheduler share the same volume
+    accessModes:
+      - ReadWriteMany
+    # -- Use an existing PVC instead of creating one
+    existingClaim: ""
+  # -- S3-compatible storage settings (ignored when backend is "local")
+  s3:
+    bucket: ""
+    endpoint: ""
+    region: "us-east-1"
+    # -- Name of an existing Secret with S3_ACCESS_KEY and S3_SECRET_KEY keys;
+    # when set, accessKey and secretKey below are ignored
+    existingSecret: ""
+    accessKey: ""
+    secretKey: ""
+
+resources:
+  limits:
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+terminationGracePeriodSeconds: 30
+
+# -- Service account for the scheduler pods
+serviceAccount:
+  create: true
+  annotations: {}
+  name: "eatpaper-scheduler-sa"
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  runAsUser: 1000
+  capabilities:
+    drop: ["ALL"]
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

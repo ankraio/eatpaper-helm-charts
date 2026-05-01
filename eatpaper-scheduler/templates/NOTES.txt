@@ -1,0 +1,8 @@
+Eatpaper Scheduler has been deployed.
+
+The scheduler runs as a background worker with {{ .Values.replicaCount }} replica(s).
+It does not expose any Service or Ingress.
+
+To check the scheduler logs:
+
+  kubectl logs -l app.kubernetes.io/name={{ include "eatpaper-scheduler.name" . }} -f
