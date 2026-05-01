@@ -1,0 +1,17 @@
+{{- $fullName := include "eatpaper-frontend.fullname" . -}}
+Eatpaper Frontend has been deployed.
+
+{{- if .Values.ingress.enabled }}
+{{- if .Values.ingress.hostname }}
+
+  URL: http{{ if .Values.ingress.tls }}s{{ end }}://{{ .Values.ingress.hostname }}{{ .Values.ingress.path }}
+{{- else }}
+
+  The Ingress has no hostname configured — it will accept traffic on any host.
+{{- end }}
+{{- else }}
+
+  No Ingress is enabled. To access the frontend from outside the cluster, run:
+
+    kubectl port-forward svc/{{ $fullName }} 8080:{{ .Values.service.port }}
+{{- end }}

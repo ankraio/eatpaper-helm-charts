@@ -1,0 +1,72 @@
+nameOverride: "eatpaper-frontend"
+
+# -- Number of pod replicas
+replicaCount: 1
+
+# -- Container image
+image:
+  repository: registry.ankra.cloud/eatpaper/eatpaper-frontend
+  pullPolicy: IfNotPresent
+  # -- List of registry pull secrets, e.g. [{name: my-secret}]
+  pullSecrets: []
+  # -- Overrides the image tag; defaults to Chart.appVersion
+  tag: ""
+
+service:
+  type: ClusterIP
+  port: 80
+  name: http
+
+# -- Ingress configuration
+ingress:
+  enabled: true
+  # -- Fully qualified hostname; leave empty to accept traffic on any host.
+  hostname: ""
+  path: /
+  ingressClassName: nginx
+  # -- Annotations added to the Ingress resource.
+  annotations: {}
+  # -- Enable TLS termination on the Ingress. Requires `hostname` to be set.
+  # The TLS secret name is derived as "<hostname>-tls".
+  # cert-manager will auto-populate this Secret when a matching ClusterIssuer
+  # annotation is present (e.g. cert-manager.io/cluster-issuer).
+  tls: true
+
+# -- Auth0 settings injected at runtime via ConfigMap (config.js)
+auth0:
+  domain: ""
+  clientId: ""
+  audience: ""
+
+resources:
+  limits:
+    memory: 128Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+# -- Service account for the frontend pods
+serviceAccount:
+  create: true
+  annotations: {}
+  name: "eatpaper-frontend-sa"
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  fsGroup: 101
+
+securityContext:
+  allowPrivilegeEscalation: false
+  runAsUser: 101
+  capabilities:
+    drop: ["ALL"]
+
+terminationGracePeriodSeconds: 10
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
